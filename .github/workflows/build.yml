@@ -56,15 +56,9 @@ jobs:
         }
         Compress-Archive @compress
 
-    - name: Upload zip package to GitHub
-      uses: actions/upload-artifact@v4.6.0
-      with:
-        name: KSPUrainian
-        path: ".\\KSP Ukrainian Localization.zip"
-  
     - name: Release
       uses: softprops/action-gh-release@v2
       if: github.ref_type == 'tag'
       with:
-        token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
-        files: ".\\KSP Ukrainian Localization.zip"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        files: "KSP Ukrainian Localization.zip"
