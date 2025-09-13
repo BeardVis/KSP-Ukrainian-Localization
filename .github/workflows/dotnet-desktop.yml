@@ -1,0 +1,70 @@
+name: Create Release
+
+on:
+  workflow_dispatch: # Allows manual triggering of the workflow from the GitHub Actions tab
+
+  push:
+    tags:
+      - v*
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      
+    strategy:
+      matrix:
+        configuration: [Release]
+
+    env:
+      Solution_Path: ".\\KSP Ukrainian Localization.sln"
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Setup NuGet
+      uses: nuget/setup-nuget@v2
+
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Restore NuGet Packages
+      run: nuget restore $env:Solution_Path
+
+    - name: 🏗️ Create the x64 app package
+      run: msbuild $env:Solution_Path /p:Configuration=$env:Configuration /p:DeployOnBuild=$env:DeployOnBuild /p:OutDir=$env:Output_Dir
+      env:
+        DeployOnBuild: true
+        Output_Dir: ".\\Output"
+        Configuration: ${{ matrix.configuration }}
+        
+    - name: Create zip
+      shell: pwsh
+      run: |
+        Move-Item -Path ".\KSP Ukrainian Localization\Output\KSPUkr.dll" -Destination ".\KSP Ukrainian Localization\Output\Assets\KSPUkr.dll"
+        Rename-Item -Path ".\KSP Ukrainian Localization\Output\Assets" -NewName "KSP Ukrainian Localization"
+        New-Item -Path ".\KSP Ukrainian Localization\Output\" -Name "GameData" -ItemType "Directory"
+        Move-Item -Path ".\KSP Ukrainian Localization\Output\KSP Ukrainian Localization" -Destination ".\KSP Ukrainian Localization\Output\GameData"
+        $compress = @{
+          Path = ".\KSP Ukrainian Localization\Output\GameData"
+          CompressionLevel = "Fastest"
+          DestinationPath = ".\KSP Ukrainian Localization.zip"
+        }
+        Compress-Archive @compress
+
+    - name: Upload zip package to GitHub
+      uses: actions/upload-artifact@v4.6.0
+      with:
+        name: KSPUrainian
+        path: ".\\KSP Ukrainian Localization.zip"
+  
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: github.ref_type == 'tag'
+      with:
+        token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+        files: ".\\KSP Ukrainian Localization.zip"
