@@ -1,64 +1,53 @@
 name: Create Release
 
 on:
-  workflow_dispatch: # Allows manual triggering of the workflow from the GitHub Actions tab
-
   push:
     tags:
-      - v*
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+.[0-9]+' 
 
 jobs:
   build:
-    runs-on: windows-latest
-    permissions:
-      contents: write
-      
-    strategy:
-      matrix:
-        configuration: [Release]
+    uses: KSPModdingLibs/KSPBuildTools/.github/workflows/build.yml@main
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
 
     env:
       Solution_Path: ".\\KSP Ukrainian Localization.sln"
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v5
-      with:
-        fetch-depth: 0
-
-    - name: Setup NuGet
-      uses: nuget/setup-nuget@v2
-
-    - name: Setup MSBuild.exe
-      uses: microsoft/setup-msbuild@v2
-
-    - name: Restore NuGet Packages
-      run: nuget restore $env:Solution_Path
-
-    - name: 🏗️ Create the x64 app package
-      run: msbuild $env:Solution_Path /p:Configuration=$env:Configuration /p:DeployOnBuild=$env:DeployOnBuild /p:OutDir=$env:Output_Dir
-      env:
-        DeployOnBuild: true
-        Output_Dir: ".\\Output"
-        Configuration: ${{ matrix.configuration }}
-        
-    - name: Create zip
-      shell: pwsh
+    - name: Parse and Validate Version from Tag
+      id: parse_version
       run: |
-        Move-Item -Path ".\KSP Ukrainian Localization\Output\KSPUkr.dll" -Destination ".\KSP Ukrainian Localization\Output\Assets\KSPUkr.dll"
-        Rename-Item -Path ".\KSP Ukrainian Localization\Output\Assets" -NewName "KSP Ukrainian Localization"
-        New-Item -Path ".\KSP Ukrainian Localization\Output\" -Name "GameData" -ItemType "Directory"
-        Move-Item -Path ".\KSP Ukrainian Localization\Output\KSP Ukrainian Localization" -Destination ".\KSP Ukrainian Localization\Output\GameData"
-        $compress = @{
-          Path = ".\KSP Ukrainian Localization\Output\GameData"
-          CompressionLevel = "Fastest"
-          DestinationPath = ".\KSP Ukrainian Localization.zip"
-        }
-        Compress-Archive @compress
+        TAG=${{ github.ref_name }}
+        echo "Processing tag: $TAG"
 
-    - name: Release
-      uses: softprops/action-gh-release@v2
-      if: github.ref_type == 'tag'
+        if [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(\.([0-9]+))?$ ]]; then
+          MAJOR=${BASH_REMATCH[1]}
+          MINOR=${BASH_REMATCH[2]}
+          PATCH=${BASH_REMATCH[3]}
+          
+          # The build number is optional, so check if the 5th group exists
+          if [[ -n "${BASH_REMATCH[5]}" ]]; then
+            BUILD=${BASH_REMATCH[5]}
+          else
+            echo "Build number not found in tag, defaulting to 0."
+            BUILD=0
+          fi
+
+          VERSION="$MAJOR.$MINOR.$PATCH.$BUILD"
+          echo "Successfully parsed version: $VERSION"
+          
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_VERSION=${VERSION}" >> "$GITHUB_ENV"
+        else
+          echo "::error::Tag format is invalid. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH.BUILD"
+          exit 1
+        fi
+
+      uses: KSPModdingLibs/KSPBuildTools/.github/workflows/create-release.yml@main
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        files: "KSP Ukrainian Localization.zip"
+        version-string: ${{ env.RELEASE_VERSION }}
+
