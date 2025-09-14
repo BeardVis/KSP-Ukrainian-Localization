@@ -7,16 +7,10 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+.[0-9]+' 
 
 jobs:
-  build:
-    uses: KSPModdingLibs/KSPBuildTools/.github/workflows/build.yml@main
-
-  release:
-    needs: build
-    runs-on: ubuntu-22.04
-
-    env:
-      Solution_Path: ".\\KSP Ukrainian Localization.sln"
-
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse_version.outputs.version }}
     steps:
     - name: Parse and Validate Version from Tag
       id: parse_version
@@ -41,13 +35,49 @@ jobs:
           echo "Successfully parsed version: $VERSION"
           
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "RELEASE_VERSION=${VERSION}" >> "$GITHUB_ENV"
+
         else
           echo "::error::Tag format is invalid. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH.BUILD"
           exit 1
         fi
 
-      uses: KSPModdingLibs/KSPBuildTools/.github/workflows/create-release.yml@main
-      with:
-        version-string: ${{ env.RELEASE_VERSION }}
+  build:
+    needs: validate
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write 
+    env:
+      TEMPLATE_EXTENSION: ".versiontemplate"
+      ARTIFACTS: GameData LICENSE* README*
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
+      - name: Update Version
+        uses: KSPModdingLibs/KSPBuildTools/.github/actions/update-version@main
+        env:
+          VERSION_STRING: ${{ needs.validate.outputs.version }}
+        with:
+          version-string: ${{ needs.validate.outputs.version }}
+          template-extension: ${{ env.TEMPLATE_EXTENSION }}
+
+      - name: Compile
+        uses: KSPModdingLibs/KSPBuildTools/.github/actions/compile@main
+
+      - name: Build
+        uses: KSPModdingLibs/KSPBuildTools/.github/actions/assemble-release@main
+        with:
+          artifacts: ${{ env.ARTIFACTS }}
+          output-file-name: ${{ github.event.repository.name }}-v${{ needs.validate.outputs.version }}
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+              --title "Release ${{ github.ref_name }}" \
+              --generate-notes \
+              $ARTIFACT_FILENAME.zip \
+              GameData/KSPUkrainian/KSPUkr.version

@@ -3,7 +3,7 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 
-namespace KSP_Ukrainian_Localization
+namespace KSPUkr
 {
     [KSPAddon(KSPAddon.Startup.Instantly, false)]
     public class Localization : MonoBehaviour
