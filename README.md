@@ -32,7 +32,7 @@ Welcome, Kerbonauts! This mod adds a complete Ukrainian translation to **Kerbal 
 3.  Поставте галочку навпроти моду та натисніть "Apply changes".
 4.  CKAN автоматично встановить усе необхідне. Готово!
 
-### Вручну (Manual Installation)
+### Вручну ([Manual Installation](https://wiki.kerbalspaceprogram.com/wiki/Tutorial:Installing_Addons))
 
 1.  Завантажте останню версію моду з [GitHub Releases](https://github.com/BeardVis/KSP-Ukrainian-Localization/releases/latest).
 2.  Відкрийте ZIP-архів.
